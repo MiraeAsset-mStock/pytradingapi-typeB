@@ -7,7 +7,7 @@ TradingAPI is a complete SDK that allows you to build a trading and investment p
 You can install the python client via pip
 
 ```
-pip install --upgrade tradingapi
+pip install --upgrade mStock-TradingApi-B
 ```
 
 It is recommended to update 'pip' and `setuptools` to the latest version if you are facing any issues during installation
@@ -20,7 +20,7 @@ pip install -U pip setuptools
 
 ```python
 import logging
-from TradingAPI.mconnect import *
+from tradingapi_b.mconnect import *
 
 logging.basicConfig(level=logging.DEBUG)
 
