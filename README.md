@@ -5,8 +5,7 @@ TradingAPI is a complete SDK that allows you to build a trading and investment p
 
 ### Installation
 > [!IMPORTANT]
-> You can install the python client with below command. For requirements.txt file [refer here](https://github.com/MiraeAsset-mStock/pytradingapi-typeA/blob/main/requirements.txt).
- 
+> You can install the python client with below command. For requirements.txt file [refer here](https://github.com/MiraeAsset-mStock/pytradingapi-typeB/blob/main/requirements.txt).
 ```
 pip install -r requirements.txt
  
