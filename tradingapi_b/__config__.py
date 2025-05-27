@@ -1,5 +1,5 @@
 API_KEY="<API_KEY>"
-default_root_uri= "https://api.mstock.trade/",
+default_root_uri= "https://api.mstock.trade/"
 routes= {
         "login":"openapi/typeb/connect/login",
         "generate_session":"openapi/typeb/session/token",
