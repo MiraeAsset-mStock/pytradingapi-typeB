@@ -17,11 +17,13 @@ test_logger.setLevel(logging.INFO)
 mconnect_obj=MConnectB()
 
 #Login Via Tasc API, Receive Token in response
-login_response=mconnect_obj.login("RAHUL","Macm@123")
+login_response=mconnect_obj.login("RAHUL","Abcd@123")
 test_logger.info(f"Request : Login. Response received : {login_response.json()}")
 
+OTP=input("Enter OTP received on registered mobile number : ")
+
 #Generate access token by calling generate session
-gen_response=mconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],"123")
+gen_response=mconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],OTP)
 test_logger.info(f"Request : Generate Session. Response received : {gen_response.json()}")
 
 

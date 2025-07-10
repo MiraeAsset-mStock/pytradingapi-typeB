@@ -19,15 +19,18 @@ test_logger.setLevel(logging.INFO)
 nconnect_obj=MConnectB()
 
 #Login Via Tasc API, Receive Token in response
-login_response=nconnect_obj.login("RAHUL","Macm@123")
+login_response=nconnect_obj.login("RAHUL","Abcd@123")
 test_logger.info(f"Request : Login. Response received : {login_response.json()}")
 
+OTP=input("Enter OTP received on registered mobile number : ")
+
 #Generate access token by calling generate session
-gen_response=nconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],"123")
+gen_response=nconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],OTP)
 test_logger.info(f"Request : Generate Session. Response received : {gen_response.json()}")
 
 #Test Place Order
 porder_resp=nconnect_obj.place_order("NORMAL","ACC-EQ","22","NSE","BUY","MARKET","20","DELIVERY","0","0","0","0","","0","DAY","") 
+
 test_logger.info(f"Request : Place Order. Response received : {porder_resp.json()}")
 
 #Get Order Book
@@ -85,3 +88,48 @@ test_logger.info(f"Request : Get Trade History. Response received : {trade_hist.
 #Convert Position
 conv_position=nconnect_obj.convert_position("NSE","3787","DELIVERY","INTRADAY","WIPRO-EQ","WIPRO","","","","","","", "","","","","","","BUY", 1,"DAY")
 test_logger.info(f"Request : Position Conversion. Response received : {conv_position.json()}")
+
+
+#Loser Gainer
+los_gain=nconnect_obj.loser_gainer("1","13","1","G")
+test_logger.info(f"Request : Loser Gainer. Response received : {los_gain.json()}")
+
+#Create Basket
+cre_basket=nconnect_obj.create_basket("Tets Baskett","Tets Bakset Description")
+test_logger.info(f"Request : Create Basket. Response received : {cre_basket.json()}")
+
+#Fetch Basket
+fetch_bask=nconnect_obj.fetch_basket()
+test_logger.info(f"Request : Fetch Basket. Response received : {fetch_bask.json()}")
+
+#Rename Basket
+rename_bask=nconnect_obj.rename_basket("ZRDTest_New","251")
+test_logger.info(f"Request : Rename Basket. Response received : {rename_bask.json()}")
+
+#Delete Basket
+del_basket=nconnect_obj.delete_basket("251")
+test_logger.info(f"Request : Delete Basket. Response received : {del_basket.json()}")
+
+#Calculate Basket
+calc_basket=nconnect_obj.calculate_basket("0","C","0","E","0","11915","LMT","Test Basket Updated Renamed","I","DAY","1","A","B","1","19.02","269","NSE")
+test_logger.info(f"Request : Calculate Basket. Response received : {calc_basket.json()}")
+
+#Get Trade Book
+trade_book=nconnect_obj.get_trade_book()
+test_logger.info(f"Request : Get Trade Book. Response received : {trade_book.json()}")
+
+#Get Intraday chart
+intr_chart=nconnect_obj.get_intraday_chart("4","AUBANK","THREE_MINUTE")
+test_logger.info(f"Request : Get Intraday chart data. Response received : {intr_chart.json()}")
+
+#Get Option Chain Master
+opt_chain_master=nconnect_obj.get_option_chain_master("5")
+test_logger.info(f"Request : Get Option Chain Master. Response received : {opt_chain_master.json()}")
+
+#Get Option Chain data
+opt_chain_data=nconnect_obj.get_option_chain_data("2","1432996200","22")
+test_logger.info(f"Request : Get Option Chain Data. Response received : {opt_chain_data.json()}")
+
+#Logout
+logout=nconnect_obj.logout()
+test_logger.info(f"Request : Logout : {logout.json()}")
