@@ -1,3 +1,11 @@
+import os,sys
+import csv
+import logging
+import json
+  
+parent_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(parent_dir)
+
 from tradingapi_b.mticker import *
 from tradingapi_b.mconnect import *
 from tradingapi_b import __config__
@@ -16,13 +24,29 @@ test_logger.setLevel(logging.INFO)
 #Object for NConnect API
 mconnect_obj=MConnectB()
 
+
+username="XXXXXXXXX" #Replace Your username here
+password="XXXXXXXXX" #Replace Your password here
+
 #Login Via Tasc API, Receive Token in response
-login_response=mconnect_obj.login("RAHUL","Macm@123")
+login_response=mconnect_obj.login(username,password)
 test_logger.info(f"Request : Login. Response received : {login_response.json()}")
 
+## !!!! NOTE - Use generate_session() only when TOTP is NOT enabled for the user. Else use verify_totp() to generate access_token !!!!
+
 #Generate access token by calling generate session
-gen_response=mconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],"123")
-test_logger.info(f"Request : Generate Session. Response received : {gen_response.json()}")
+# OTP=input("Enter OTP received on mobile no or email id : ");
+# gen_response=mconnect_obj.generate_session(__config__.API_KEY,login_response.json()["data"]["jwtToken"],OTP)
+# test_logger.info(f"Request : Generate Session. Response received : {gen_response.json()}")
+
+
+## !!!! NOTE - If TOTP is enabled for the user, then only call Verify TOTP. Else skip verify_totp() !!!!
+
+#verify TOTP 
+TOTP=input("Enter TOTP from Auhtenticator app : ");
+gen_response=mconnect_obj.verify_totp(__config__.API_KEY,login_response.json()["data"]["jwtToken"],TOTP)
+test_logger.info(f"Request : Verify TOTP. Response received : {gen_response.json()}")
+print(gen_response.json())
 
 
 #Testing Orders Modification, Placement API etc
@@ -38,8 +62,10 @@ m_ticker=MTicker(api_key,access_token,__config__.mticker_url)
 
 
 def on_ticks(ws, ticks):
-    # Callback to receive ticks.
-    test_logger.info("Ticks: {}".format(ticks))
+    # Use the built-in format_tick_data method from MTicker
+    formatted_ticks = m_ticker.format_tick_data(ticks)
+    for formatted_tick in formatted_ticks:
+        test_logger.info(json.dumps(formatted_tick, separators=(',', ':')))
 
 def on_order_update(ws,data):
     #Callback to receive Order Updates
@@ -52,14 +78,22 @@ def on_trade_update(ws,data):
 def on_connect(ws, response):
     # Callback on successful connect.
     m_ticker.send_login_after_connect()
-    # Subscribe to a list of instrument_tokens 
-    ws.subscribe("NSE",[5633])
+    # Subscribe to a list of instrument_tokens with different modes
+    ws.subscribe("NSE",[22,9552], m_ticker.MODE_SNAP)  # Full market depth
+    # ws.subscribe("NSE",[22], m_ticker.MODE_LTP)   # LTP only
+    # ws.subscribe("NSE",[22], m_ticker.MODE_QUOTE) # Quote data
+
+    # Try subscribing to an F&O instrument to test open interest
+    # ws.subscribe("NFO",[38477], m_ticker.MODE_SNAP)  # Example F&O token
     print("Connected to socket and logged in successfully")
 
 def on_close(ws, code, reason):
     # On connection close stop the event loop.
     # Reconnection will not happen after executing `ws.stop()`
-    ws.stop()
+    try:
+        ws.stop()
+    except:
+        pass
 
 # Assign the callbacks.
 m_ticker.on_ticks = on_ticks
@@ -72,14 +106,19 @@ m_ticker.on_trade_update=on_trade_update
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
-m_ticker.connect()
-
-
-test_logger.info('Now Closing Web socket connection')
-
-m_ticker.close()
-
-test_logger.info('Testing complete')
+try:
+    m_ticker.connect()
+except KeyboardInterrupt:
+    test_logger.info('Keyboard interrupt received')
+except Exception as e:
+    test_logger.info(f'Error occurred: {e}')
+finally:
+    test_logger.info('Now Closing Web socket connection')
+    try:
+        m_ticker.close()
+    except:
+        pass
+    test_logger.info('Testing complete')
 
 
 

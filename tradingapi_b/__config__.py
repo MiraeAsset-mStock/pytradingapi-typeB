@@ -1,8 +1,9 @@
-API_KEY="<API_KEY>"
+API_KEY="ENTER_YOUR_API_KEY_HERE"
 default_root_uri= "https://api.mstock.trade/"
 routes= {
         "login":"openapi/typeb/connect/login",
         "generate_session":"openapi/typeb/session/token",
+        "verify_totp":"openapi/typeb/session/verifytotp",
         "place_order":"openapi/typeb/orders/regular",
         "modify_order":"openapi/typeb/orders/regular/{order_id}",
         "cancel_order":"openapi/typeb/orders/regular/{order_id}",
@@ -18,6 +19,17 @@ routes= {
         "instrument_scrip":"openapi/typeb/instruments/OpenAPIScripMaster",
         "fund_summary":"openapi/typeb/user/fundsummary",
         "trade_history":"openapi/typeb/trades",
-        "position_conversion":"openapi/typeb/portfolio/convertposition"
+        "position_conversion":"openapi/typeb/portfolio/convertposition",
+        "loser_gainer":"openapi/typeb/losergainer", 
+        "create_basket":"openapi/typeb/CreateBasket", 
+        "fetch_basket":"openapi/typeb/FetchBasket", 
+        "rename_basket":"openapi/typeb/RenameBasket", 
+        "delete_basket":"openapi/typeb/DeleteBasket", 
+        "calculate_basket":"openapi/typeb/CalculateBasket", 
+        "trade_book":"openapi/typeb/tradebook", 
+        "intraday_chart":"openapi/typeb/instruments/intraday", 
+        "option_chain_master":"openapi/typeb/getoptionchainmaster/{exchange_id}",  
+        "option_chain_data":"openapi/typeb/GetOptionChain/{exchange_id}/{expiry}/{token}", 
+        "logout":"openapi/typeb/logout" 
     }
 mticker_url="wss://ws.mstock.trade"

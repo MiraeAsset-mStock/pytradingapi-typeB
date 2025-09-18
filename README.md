@@ -47,21 +47,80 @@ try:
 
 except Exception as e:
     logging.info("Order placement failed: {}".format(e.message))
+#Modify Order
+mconnect_obj.modify_order("NORMAL","order_id","MARKET","DELIVERY","DAY","0","10","SBIN-EQ","3045","NSE","780")
 
-#Fetch all orders
-mconnect_obj.get_order_book()
-
-#Fetch all holdings
-mconnect_obj.get_holdings()
-
-#Get Net position for logged in user
-mconnect_obj.get_net_position()
+#Cancel Order
+mconnect_obj.cancel_order("NORMAL","order_id")
 
 #Cancel All orders
 mconnect_obj.cancel_all()
 
+#Get Order Details
+mconnect_obj.get_order_details("order_id")
+
+#Fetch all orders
+mconnect_obj.get_order_book()
+
+#Get Net position for logged in user
+mconnect_obj.get_net_position()
+
+#Calculate Order Margin
+mconnect_obj.calculate_order_margin("DELIVERY","BUY","5","2250","NSE","ACC","22","0")
+
+#Fetch all holdings
+mconnect_obj.get_holdings()
+
+#Get Historical Chart
+mconnect_obj.get_historical_chart("NSE","11536","ONE_HOUR","01-02-2025","07-02-2025")
+
+#Get Market Quote
+mconnect_obj.get_market_quote("OHLC",{"NSE": ["3045"],"BSE": ["500410"]})
+
+#Get Instrument Master
+mconnect_obj.get_instruments()
+
 #Get fund Summary
 mconnect_obj.get_fund_summary()
+
+#Get Trade History
+mconnect_obj.get_trade_history("2025-01-15","02-02-2025")
+
+#Convert Position
+mconnect_obj.convert_position("NSE","3787","DELIVERY","INTRADAY","WIPRO-EQ","WIPRO","","","","","","", "","","","","","","BUY", 1,"DAY")
+
+#Loser Gainer
+mconnect_obj.loser_gainer("1","13","1","G")
+
+#Create Basket
+mconnect_obj.create_basket("Test Basket","Test Basket Description")
+
+#Fetch Basket
+mconnect_obj.fetch_basket()
+
+#Rename Basket
+mconnect_obj.rename_basket("New Basket Name","basket_id")
+
+#Delete Basket
+mconnect_obj.delete_basket("basket_id")
+
+#Calculate Basket
+mconnect_obj.calculate_basket("0","C","0","E","0","11915","LMT","Test Basket","I","DAY","1","A","B","1","19.02","269","NSE")
+
+#Get Trade Book
+mconnect_obj.get_trade_book()
+
+#Get Intraday Chart
+mconnect_obj.get_intraday_chart("1","AUBANK","ONE_MINUTE")
+
+#Get Option Chain Master
+mconnect_obj.get_option_chain_master("5")
+
+#Get Option Chain Data
+mconnect_obj.get_option_chain_data("2","1432996200","22")
+
+#Logout
+mconnect_obj.logout()
 
 ```
 

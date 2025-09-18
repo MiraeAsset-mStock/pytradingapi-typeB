@@ -9,7 +9,7 @@ import json
 import threading
 import struct
 import logging
-from datetime import datetime
+from datetime import datetime,timezone,timedelta
 from twisted.internet import reactor,ssl
 from twisted.internet.protocol import ReconnectingClientFactory
 from autobahn.twisted.websocket import WebSocketClientProtocol, WebSocketClientFactory, connectWS
@@ -383,19 +383,41 @@ class MTicker(object):
             self._close(reason="Error while subscribe: {}".format(str(e)))
             raise
 
-    def subscribe(self,exchangeType,instrument_tokens):
+
+    def _split_packets(self, bin):
+        """Split the data to individual packets of ticks."""
+        # Ignore heartbeat data.
+        if len(bin) < 2:
+            return []
+
+        number_of_packets = self._unpack_int(bin, 0, 2, byte_format="H")
+        packets = []
+
+        j = 2
+        for i in range(number_of_packets):
+            packet_length = self._unpack_int(bin, j, j + 2, byte_format="H")
+            packets.append(bin[j + 2: j + 2 + packet_length])
+            j = j + 2 + packet_length
+
+        return packets
+    
+    def subscribe(self,exchangeType,instrument_tokens, mode=None):
         """
         Subscribe to a list of instrument_tokens.
 
         - `instrument_tokens` is list of instrument instrument_tokens to subscribe
+        - `mode` is the subscription mode (MODE_LTP=1, MODE_QUOTE=2, MODE_SNAP=3)
         """
+        if mode is None:
+            mode = self.MODE_SNAP
+            
         try:
             #Subscription Packet
             _packet={
                 "correlationID": "",
                 "action": self._message_subscribe,
                 "params": {
-                    "mode": self.MODE_QUOTE,
+                    "mode": mode,
                     "tokenList": [
                     {
                         "exchangeType": self.EXCHANGE_TYPE[str(exchangeType).lower()] if str(exchangeType).lower() in self.EXCHANGE_TYPE else 1,
@@ -405,10 +427,12 @@ class MTicker(object):
                     }
             }
 
+            #_packet = {"correlationID": "Optional Field","action": 1,"params": {"mode": 3,"tokenList": [{"exchangeType": 1,"tokens": ["22","1333"]}]}}
+
             self.ws.sendMessage(six.b(json.dumps(_packet)))
 
             for token in instrument_tokens:
-                self.subscribed_tokens[token] = self.MODE_QUOTE
+                self.subscribed_tokens[token] = mode
 
             return True
         except Exception as e:
@@ -496,7 +520,9 @@ class MTicker(object):
 
         # If the message is binary, parse it and send it to the callback.
         if self.on_ticks and is_binary and len(payload) > 4:
-            self.on_ticks(self, self._parse_binary(payload))
+            parsed_data = self._parse_binary(payload)
+            converted_data = self._convert_prices(parsed_data)
+            self.on_ticks(self, converted_data)
 
         # Parse text messages
         if not is_binary:
@@ -544,19 +570,122 @@ class MTicker(object):
         if data.get("type") == "error":
             self._on_error(self, 0, data.get("data"))
 
+    def convert_from_unix_timestamp(self,timeStamp: int, year=1980):
+        # Convert Unix timestamp into a datetime value
+        origin = datetime(year, 1, 1, 0, 0, 0, 0, tzinfo=timezone.utc)
+        if timeStamp != 0:
+            return origin + timedelta(seconds=timeStamp)
+        return origin
+        
+    def _convert_prices(self, tick_data):
+        """Convert tick prices from API format (multiplied by 100) to actual prices"""
+        for tick in tick_data:
+            for field in ['ltp', 'avg_traded_price']:
+                if field in tick:
+                    tick[field] = tick[field] / 100
+            if 'ohlc' in tick:
+                for key in ['open', 'high', 'low', 'close']:
+                    if key in tick['ohlc']:
+                        tick['ohlc'][key] = tick['ohlc'][key] / 100
+            for field in ['upper_circuit_lmt', 'lower_circuit_lmt', '52_wk_high', '52_wk_low']:
+                if field in tick and tick[field] > 0:
+                    tick[field] = tick[field] / 100
+            # Convert depth prices
+            if 'bid' in tick:
+                for bid in tick['bid']:
+                    if 'price' in bid:
+                        bid['price'] = bid['price'] / 100
+            if 'ask' in tick:
+                for ask in tick['ask']:
+                    if 'price' in ask:
+                        ask['price'] = ask['price'] / 100
+        return tick_data
+
+    def format_tick_data(self, ticks):
+        """Convert tick data to expected API format with proper field names"""
+        formatted_ticks = []
+        
+        for tick in ticks:
+            formatted_tick = {
+                "SubscriptionMode": tick.get("subscription_mode", 0),
+                "ExchangeType": tick.get("exchange_type", 0),
+                "Token": int(tick.get("instrument_token", "0")),
+                "SeqNumber": tick.get("sequence_no", 0),
+                "ExchangeTimestamp": tick.get("ex_timestamp", ""),
+                "LTP": tick.get("ltp", 0),
+                "LTQ": tick.get("last_traded_qty", 0),
+                "ATP": tick.get("avg_traded_price", 0),
+                "VTT": tick.get("vol_traded_today", 0),
+                "TotalBuyQty": tick.get("tot_buy_qty", 0.0),
+                "TotalSellQty": tick.get("tot_sell_qty", 0.0),
+                "LTT": tick.get("last_traded_timestamp", ""),
+                "OI": tick.get("open_interest", 0),
+                "OIChange": tick.get("open_interest_percent", 0.0),
+                "UpperCircuitLimit": tick.get("upper_circuit_lmt", 0),
+                "LowerCircuitLimit": tick.get("lower_circuit_lmt", 0),
+                "FiftyTwoWeekHigh": tick.get("52_wk_high", 0),
+                "FiftyTwoWeekLow": tick.get("52_wk_low", 0)
+            }
+            
+            # Add OHLC data
+            if "ohlc" in tick:
+                ohlc = tick["ohlc"]
+                formatted_tick.update({
+                    "Open": ohlc.get("open", 0),
+                    "High": ohlc.get("high", 0),
+                    "Low": ohlc.get("low", 0),
+                    "Close": ohlc.get("close", 0)
+                })
+            
+            # Add depth data if available
+            if "bid" in tick or "ask" in tick:
+                depth = []
+                # Add bid data
+                if "bid" in tick:
+                    for bid in tick["bid"]:
+                        depth.append({
+                            "BuySellFlag": bid.get("buy_or_sell", 0),
+                            "Quantity": bid.get("quantity", 0),
+                            "Price": bid.get("price", 0),
+                            "NumberOfOrders": bid.get("orders", 0)
+                        })
+                # Add ask data  
+                if "ask" in tick:
+                    for ask in tick["ask"]:
+                        depth.append({
+                            "BuySellFlag": ask.get("buy_or_sell", 0),
+                            "Quantity": ask.get("quantity", 0),
+                            "Price": ask.get("price", 0),
+                            "NumberOfOrders": ask.get("orders", 0)
+                        })
+                formatted_tick["Depth"] = depth
+            
+            formatted_ticks.append(formatted_tick)
+        
+        return formatted_ticks
+
     def _parse_binary(self, bin):
         """Parse binary data to a (list of) ticks structure."""
         try:
+
+            
             #Assuming every message has a single packet
             data = []
 
             #for packet in packets:
             packet=bin
-            subscription_mode=int.from_bytes(packet[0:1], sys.byteorder)
+            
+            subscription_mode = int.from_bytes(packet[0:1], sys.byteorder)
             exchange_type=int.from_bytes(packet[1:2], sys.byteorder)
-            instrument_token = int.from_bytes( packet[2:27], sys.byteorder)
+            # Parse instrument token as string from bytes 2-27, removing null bytes
+            instrument_token = packet[2:27].decode('utf-8').replace('\x00', '').strip()
+            # If it's empty or invalid, try parsing as integer from specific bytes
+            if not instrument_token or not instrument_token.isdigit():
+                instrument_token = str(struct.unpack('<I', packet[2:6])[0])
+            #instrument_token=int.from_bytes(packet[2:27], sys.byteorder)
             sequence_no=int.from_bytes( packet[27:35], sys.byteorder)
-            ex_timestamp=datetime.fromtimestamp(int.from_bytes( packet[35:43], sys.byteorder))
+            # ex_timestamp=datetime.fromtimestamp(int.from_bytes( packet[35:43], sys.byteorder)).strftime("%Y-%m-%dT%I:%M:%S%p") #Added on 25-06-25
+            ex_timestamp=self.convert_from_unix_timestamp(int.from_bytes( packet[35:43], sys.byteorder)).strftime("%Y-%m-%dT%I:%M:%S%p") #Added on 25-06-25
             ltp=int.from_bytes( packet[43:51], sys.byteorder)
 
             #segment = instrument_token & 0xff  # Retrive segment constant from instrument_token
@@ -564,9 +693,8 @@ class MTicker(object):
             # Add price divisor based on segment
             #Right now keeping it 100 for all
             divisor = 100.0
-
             #LTP Mode packets
-            if len(packet)==6:
+            if len(packet)==51:
                 data.append(
                     {
                         "mode":self.MODE_LTP,
@@ -593,8 +721,8 @@ class MTicker(object):
                     "last_traded_qty":int.from_bytes( packet[51:59], sys.byteorder),
                     "avg_traded_price":int.from_bytes( packet[59:67], sys.byteorder),
                     "vol_traded_today":int.from_bytes( packet[67:75], sys.byteorder),
-                    "tot_buy_qty":int.from_bytes( packet[75:83], sys.byteorder),
-                    "tot_sell_qty":int.from_bytes( packet[83:91], sys.byteorder),
+                    "tot_buy_qty":struct.unpack('d', packet[75:83])[0],  #int.from_bytes( packet[75:83], sys.byteorder),
+                    "tot_sell_qty":struct.unpack('d', packet[83:91])[0],# int.from_bytes( packet[83:91], sys.byteorder),
                     "ohlc": {
                             "open": int.from_bytes( packet[91:99], sys.byteorder),
                             "high": int.from_bytes( packet[99:107], sys.byteorder),
@@ -602,34 +730,50 @@ class MTicker(object):
                             "close": int.from_bytes( packet[115:123], sys.byteorder),
                         }
                     }
+                
 
                 if len(packet)==379:
                     try:
-                        timestamp = datetime.fromtimestamp(self._unpack_int(packet, 123, 131))
-                    except Exception:
+                        # timestamp = datetime.fromtimestamp(self._unpack_int(packet, 123, 131)).strftime("%Y-%m-%dT%I:%M:%S%p") #Added on 25-06-25
+                        timestamp = self.convert_from_unix_timestamp(int.from_bytes( packet[123:131], sys.byteorder)).strftime("%Y-%m-%dT%I:%M:%S%p") #Added on 25-06-25
+                    except Exception as e:
+                        print(e)
                         timestamp = None
                     d["last_traded_timestamp"]=timestamp
-                    d["open_interest"]=self._unpack_int(packet, 131, 139)
-                    d["open_interest_percent"]=self._unpack_int(packet, 139, 147)
+                    d["open_interest"]=int.from_bytes( packet[131:139], sys.byteorder) #struct.unpack('d', packet[131:139])[0],
+                    d["open_interest_percent"]=struct.unpack('d', packet[139:147])[0]  #self._unpack_int(packet, 139, 147,byte_format='q')
 
+
+                    
                     #Market Depth 200 bytes 147+200
                     depth = {
                             "bid": [],
                             "ask": []
                             }
 
-                    for i,p in enumerate(range(147, len(packet), 4)):
-                        depth["ask" if i >= 5 else "bid"].append({
-                                    "buy_or_sell":self._unpack_int(packet, p, p + 2),
-                                    "quantity":self._unpack_int(packet, p + 2, p + 10),
-                                    "price":self._unpack_int(packet, p + 10, p + 18)/divisor,
-                                    "orders":self._unpack_int(packet, p + 18, p + 20, byte_format="H")
+                    for i in range(10):  # 5 bid + 5 ask levels
+                        p = 147 + (i * 20)  # Each depth entry is 20 bytes
+                        if p + 20 <= len(packet):
+                            buy_sell_flag = struct.unpack('<H', packet[p:p+2])[0]
+                            quantity = struct.unpack('<Q', packet[p+2:p+10])[0]
+                            price = struct.unpack('<Q', packet[p+10:p+18])[0]
+                            orders = struct.unpack('<H', packet[p+18:p+20])[0]
+                            
+                            if quantity > 0 and price > 0:  # Only add valid entries
+                                depth["bid" if i < 5 else "ask"].append({
+                                    "buy_or_sell": buy_sell_flag,
+                                    "quantity": quantity,
+                                    "price": price,
+                                    "orders": orders
                                 })
 
-                    d["upper_circuit_lmt"]=self._unpack_int(packet, 347, 355)
-                    d["lower_circuit_lmt"]=self._unpack_int(packet, 355, 363)
-                    d["52_wk_high"]=self._unpack_int(packet, 363, 371)
-                    d["52_wk_low"]=self._unpack_int(packet, 371, 379)
+                    
+                    d["bid"] = depth["bid"]
+                    d["ask"] = depth["ask"]
+                    d["upper_circuit_lmt"]= int.from_bytes(packet[347:355], sys.byteorder, signed=False) # self._unpack_int(packet, 347, 355)
+                    d["lower_circuit_lmt"]=int.from_bytes(packet[355:363], sys.byteorder, signed=False)   #self._unpack_int(packet, 355, 363)
+                    d["52_wk_high"]=int.from_bytes(packet[363:371], sys.byteorder, signed=False) #self._unpack_int(packet, 363, 371)
+                    d["52_wk_low"]=int.from_bytes(packet[371:379], sys.byteorder, signed=False) #self._unpack_int(packet, 371, 379)
 
                 data.append(d)
             return data

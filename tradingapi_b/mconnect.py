@@ -5,6 +5,7 @@ import tradingapi_b.exceptions as ex
 from tradingapi_b import __config__
 from urllib.parse import urljoin
 
+
 default_log = logging.getLogger("mconnect.log")
 default_log.addHandler(logging.FileHandler("mconnect.log", mode='a'))
 
@@ -49,7 +50,6 @@ class MConnectB:
         Login with credentials and obtains 
         '''
         data={"clientcode":user_id,"password":password,"totp": "","state": ""}
-        url = urljoin(self.default_root_uri, self.routes["login"])
         try:
             #Using session request
             login_response=self._post(
@@ -59,6 +59,7 @@ class MConnectB:
                 content_type="application/json"
             )
         except Exception as e:
+            print(e)
             type_, value_, traceback_ = sys.exc_info()
             stack_trace = traceback.format_exception(type_, value_, traceback_)
             self.logger.error(stack_trace)
@@ -94,6 +95,30 @@ class MConnectB:
             if gen_session.json()["data"]!=None and "jwtToken" in gen_session.json()["data"]:
                 self.set_access_token(gen_session.json()["data"]["jwtToken"])
         return gen_session
+    
+    def verify_totp(self,_api_key,_request_token,_tOtp):
+        if self.api_key is None:
+            self.set_api_key(_api_key)
+        '''
+        Method for TOTP verification for valid clients
+        '''
+        data={"api_key":_api_key,"refreshToken":_request_token,"totp":_tOtp}
+        try:
+            verify_totp_user=self._post(
+                route="verify_totp",
+                params=data,
+                is_json=True,
+                content_type="application/json"
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        if "data" in verify_totp_user.json():
+            if verify_totp_user.json()["data"]!=None and "jwtToken" in verify_totp_user.json()["data"]:
+                self.set_access_token(verify_totp_user.json()["data"]["jwtToken"])
+        return verify_totp_user
 
     def place_order(self,_variety,_tradingsymbol,_symboltoken,_exchange,_transactiontype,_ordertype,_quantity,_producttype,_price,_triggerprice,_squareoff,_stoploss,_trailingStopLoss,_disclosedquantity,_duration,_ordertag):
         order_packet={"variety":_variety,"tradingsymbol":_tradingsymbol,"symboltoken":_symboltoken,"exchange":_exchange,"transactiontype":_transactiontype,"ordertype":_ordertype,"quantity":_quantity,"producttype":_producttype,"price":_price,"triggerprice":_triggerprice,"squareoff":_squareoff,"stoploss":_stoploss,"trailingStopLoss":_trailingStopLoss,"disclosedquantity":_disclosedquantity,"duration":_duration,"ordertag":_ordertag}
@@ -112,10 +137,10 @@ class MConnectB:
             raise e
         return order_session
        
-    def modify_order(self,_variety,_orderid,_ordertype,_producttype,_duration,_price,_quantity,_tradingsymbol,_symboltoken,_exchange):
+    def modify_order(self,_variety,_orderid,_ordertype,_producttype,_duration,_price,_quantity,_tradingsymbol,_symboltoken,_exchange,_triggerPrice):
         url_args={"order_id": _orderid}
         #url = urljoin(self.default_root_uri, self.routes["modify_order"].format(**url_args))
-        order_packet={"variety":_variety,"orderid": _orderid,"ordertype":_ordertype ,"producttype":_producttype,"duration":_duration,"price":_price,"quantity":_quantity,"tradingsymbol":_tradingsymbol ,"symboltoken": _symboltoken,"exchange": _exchange}
+        order_packet={"variety":_variety,"orderid": _orderid,"ordertype":_ordertype ,"producttype":_producttype,"duration":_duration,"price":_price,"quantity":_quantity,"tradingsymbol":_tradingsymbol ,"symboltoken": _symboltoken,"exchange": _exchange,"triggerprice":_triggerPrice} #15-07-25
         try:
             #Using session request
             modify_session=self._put(
@@ -195,8 +220,10 @@ class MConnectB:
             raise e
         return get_position
     
-    def calculate_order_margin(self,_product_type,_transaction_type,_quantity,_price,_exchange,_symbol_name,_token,_trigger_price):
-        calc_data={"product_type":_product_type ,"transaction_type":_transaction_type ,"quantity": _quantity,"price": _price,"exchange": _exchange,"symbol_name": _symbol_name,"token": _token,"trigger_price": _trigger_price}
+    def calculate_order_margin(self,_product_type,_transaction_type,_quantity,_price,_exchange,_symbol_name,_token,_trigger_price="0"):
+        packet_data={"product_type":_product_type ,"transaction_type":_transaction_type ,"quantity": _quantity,"price": _price,"exchange": _exchange,"symbol_name": _symbol_name,"token": _token,"trigger_price": _trigger_price}
+        #Added this on 29-07-2025 by shri
+        calc_data={"orders":[packet_data]}
         try:
             #Using session request
             ord_margin=self._post(
@@ -213,14 +240,14 @@ class MConnectB:
         return ord_margin
     
     #New Endpoint
-    def get_order_details(self,_order_id,_segment):
+    def get_order_details(self,_order_id,_segment="E"):
         '''
         Method to retrieve the status of individual order using the order id.
         '''
         details_packet={"order_no":_order_id,"segment":_segment}
         try:
             #Using session request
-            get_ord_details=self._get(
+            get_ord_details=self._post(
                 route="order_details",
                 params=details_packet,
                 is_json=True,
@@ -233,7 +260,6 @@ class MConnectB:
             raise e
         return get_ord_details
     
-    #New Endpoint
     def get_holdings(self):
         '''
         Method to retrieve all the list of holdings that contain the user's portfolio of long term equity delivery stocks.
@@ -254,7 +280,8 @@ class MConnectB:
         request_packet={"exchange": _exchange,"symboltoken": _security_token,"interval": _interval,"fromdate": _fromDate,"todate": _toDate}
         try:
             #Using session request
-            get_hist_chart=self._get(
+            #Changed to post on 29-07-25
+            get_hist_chart=self._post(
                 route="historical_chart",
                 params=request_packet,
                 is_json=True,
@@ -274,7 +301,7 @@ class MConnectB:
         quote_details={"mode":_mode,"exchangeTokens":_exchangeTokens}
         try:
             #Using session request
-            get_quote_data=self._get(
+            get_quote_data=self._post(
                 route="market_quote",
                 params=quote_details,
                 is_json=True,
@@ -316,7 +343,7 @@ class MConnectB:
         details_packet={"fromdate":_fromDate,"todate":_toDate}
         try:
             #Using session request
-            get_trade=self._get(
+            get_trade=self._post(
                 route="trade_history",
                 params=details_packet,
                 is_json=True,
@@ -345,6 +372,170 @@ class MConnectB:
             self.logger.error(stack_trace)
             raise e
         return conv_position
+    
+    def loser_gainer(self,_Exchange,_SecurityIdCode,_segment,_typeFlag):
+        data_packet={"Exchange":_Exchange,"SecurityIdCode":_SecurityIdCode,"segment":_segment,"TypeFlag":_typeFlag}
+        try:
+            _loserGainer=self._post(
+                route="loser_gainer",
+                url_args=None,
+                content_type="application/json", #Added on 29-07-25 by shri
+                is_json=True,
+                params=data_packet
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return _loserGainer
+    
+    def create_basket(self,_BaskName,_BaskDesc):
+        bask_packet={"BaskName":_BaskName,"BaskDesc":_BaskDesc}
+        try:
+            createBasket=self._post(
+                    route="create_basket",
+                    url_args=None,
+                    content_type="application/json", #Changed on 29-07-25 by shri
+                    params=bask_packet,
+                    is_json=True
+                )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return createBasket
+        
+    def fetch_basket(self):
+        try:
+            basket=self._get(
+                route="fetch_basket",
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return basket
+    
+    def rename_basket(self,_basketName,_BasketId):
+        try:
+            data_packet={"basketName":_basketName,"BasketId":_BasketId}
+            _rename_basket=self._put(
+                route="rename_basket",
+                url_args=None,
+                content_type="application/json", #Changed on 29-07-25 by shri
+                is_json=True,
+                params=data_packet
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return _rename_basket
+
+    def delete_basket(self,_BasketId):
+        try:
+            data_packet={"BasketId":_BasketId}
+            _delete_basket=self._delete(
+                route="delete_basket",
+                url_args=None,
+                content_type="application/json",
+                is_json=True,
+                params=data_packet
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return _delete_basket
+
+    def calculate_basket(self,_include_exist_pos,_ord_product,_disc_qty,_segment,_trigger_price,_scriptcode,_ord_type,_basket_name,_operation,_order_validity,_order_qty,_script_stat,_buy_sell_indi,_basket_priority,_order_price,_basket_id,_exch_id):
+        try:
+            data_packet={"include_exist_pos":_include_exist_pos,"ord_product":_ord_product,"disc_qty":_disc_qty,"segment":_segment,"trigger_price":_trigger_price,"scriptcode":_scriptcode,"ord_type":_ord_type,"basket_name":_basket_name,"operation":_operation,"order_validity":_order_validity,"order_qty":_order_qty,"script_stat":_script_stat,"buy_sell_indi":_buy_sell_indi,"basket_priority":_basket_priority,"order_price":_order_price,"basket_id":_basket_id,"exch_id":_exch_id}
+            _calculate_basket=self._post(
+                route="calculate_basket",
+                url_args=None,
+                content_type="application/json", #Changed on 29-07-25 by shri
+                is_json=True,
+                params=data_packet
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return _calculate_basket
+
+    def get_trade_book(self):
+        try:
+            trade_book_details=self._get(
+                route="trade_book",
+                url_args=None,
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+        return trade_book_details
+
+    def get_intraday_chart(self,_exchange,_symbolname,_interval):
+        try:
+            data_packet={"exchange": _exchange,"symbolname":_symbolname,"interval": _interval}
+            intraday_chart=self._post(
+                route="intraday_chart",
+                params=data_packet,
+                is_json=True,
+                content_type="application/json"
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return intraday_chart
+
+    def get_option_chain_master(self,_exchangeID):
+        try:
+            url_args={"exchange_id":_exchangeID}
+            opt_chain_mast=self._get(
+                route="option_chain_master",
+                url_args=url_args
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+        return opt_chain_mast
+
+    def get_option_chain_data(self,_exchange_id,_expiry,_token):
+        try:
+            url_args={"exchange_id":_exchange_id,"expiry":_expiry,"token":_token}
+            opt_chain_data=self._get(
+                route="option_chain_data",
+                url_args=url_args
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+        return opt_chain_data
+
+    def logout(self):
+        try:
+            logout=self._get(
+                route="logout",
+                url_args=None
+            )
+        except Exception as e:
+            type_, value_, traceback_ = sys.exc_info()
+            stack_trace = traceback.format_exception(type_, value_, traceback_)
+            self.logger.error(stack_trace)
+            raise e
+        return logout
     
     def _get(self, route, url_args=None, content_type=None, params=None, is_json=False):
         """Alias for sending a GET request."""
