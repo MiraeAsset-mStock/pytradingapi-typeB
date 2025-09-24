@@ -25,8 +25,8 @@ test_logger.setLevel(logging.INFO)
 mconnect_obj=MConnectB()
 
 
-username="XXXXXXXXX" #Replace Your username here
-password="XXXXXXXXX" #Replace Your password here
+username="XXXXXXXX" #Replace Your username here
+password="XXXXXXXX" #Replace Your password here
 
 #Login Via Tasc API, Receive Token in response
 login_response=mconnect_obj.login(username,password)
@@ -79,7 +79,7 @@ def on_connect(ws, response):
     # Callback on successful connect.
     m_ticker.send_login_after_connect()
     # Subscribe to a list of instrument_tokens with different modes
-    ws.subscribe("NSE",[22,9552], m_ticker.MODE_SNAP)  # Full market depth
+    ws.subscribe("NSE",[22], m_ticker.MODE_SNAP)  # Full market depth
     # ws.subscribe("NSE",[22], m_ticker.MODE_LTP)   # LTP only
     # ws.subscribe("NSE",[22], m_ticker.MODE_QUOTE) # Quote data
 

@@ -21,8 +21,8 @@ test_logger.setLevel(logging.INFO)
 #Object for NConnect API
 nconnect_obj=MConnectB()
 
-username="XYZ" #Your username
-password="STAR@123" #Your password
+username="XXXXXXXX" #Replace with username
+password="XXXXXXXX" #Replace wiht password
 
 #Login Via Tasc API, Receive Token in response
 login_response=nconnect_obj.login(username,password)
