@@ -280,7 +280,6 @@ class MConnectB:
         request_packet={"exchange": _exchange,"symboltoken": _security_token,"interval": _interval,"fromdate": _fromDate,"todate": _toDate}
         try:
             #Using session request
-            #Changed to post on 29-07-25
             get_hist_chart=self._post(
                 route="historical_chart",
                 params=request_packet,
@@ -379,7 +378,7 @@ class MConnectB:
             _loserGainer=self._post(
                 route="loser_gainer",
                 url_args=None,
-                content_type="application/json", #Added on 29-07-25 by shri
+                content_type="application/json",
                 is_json=True,
                 params=data_packet
             )
@@ -396,7 +395,7 @@ class MConnectB:
             createBasket=self._post(
                     route="create_basket",
                     url_args=None,
-                    content_type="application/json", #Changed on 29-07-25 by shri
+                    content_type="application/json",
                     params=bask_packet,
                     is_json=True
                 )
@@ -425,7 +424,7 @@ class MConnectB:
             _rename_basket=self._put(
                 route="rename_basket",
                 url_args=None,
-                content_type="application/json", #Changed on 29-07-25 by shri
+                content_type="application/json",
                 is_json=True,
                 params=data_packet
             )
@@ -459,7 +458,7 @@ class MConnectB:
             _calculate_basket=self._post(
                 route="calculate_basket",
                 url_args=None,
-                content_type="application/json", #Changed on 29-07-25 by shri
+                content_type="application/json", 
                 is_json=True,
                 params=data_packet
             )
