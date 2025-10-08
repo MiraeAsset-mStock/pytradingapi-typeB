@@ -240,11 +240,11 @@ class MConnectB:
         return ord_margin
     
     #New Endpoint
-    def get_order_details(self,_order_id,_segment="E"):
+    def get_order_details(self,_order_id):
         '''
         Method to retrieve the status of individual order using the order id.
         '''
-        details_packet={"order_no":_order_id,"segment":_segment}
+        details_packet={"order_no":_order_id}
         try:
             #Using session request
             get_ord_details=self._post(
@@ -582,14 +582,14 @@ class MConnectB:
                 self.logger.debug("Request: {method} {url} {data} {headers}".format(method=method, url=url, data=params, headers=headers))
         
         # prepare url query params
-        if method in ["GET", "DELETE"]:
+        if method == "GET" or (method == "DELETE" and not is_json):
             query_params = params
 
         try:
             response_data = self.request_session.request(method,
                                         url,
-                                        json=params if (method in ["POST", "PUT"] and is_json) else None,
-                                        data=params if (method in ["POST", "PUT"] and not is_json) else None,
+                                        json=params if (method in ["POST", "PUT", "DELETE"] and is_json) else None,
+                                        data=params if (method in ["POST", "PUT", "DELETE"] and not is_json) else None,
                                         params=query_params,
                                         headers=headers,
                                         verify=not self.disable_ssl,
@@ -601,6 +601,10 @@ class MConnectB:
         if self.debug:
             self.logger.debug("Response: {code} {content}".format(code=response_data.status_code, content=response_data.content))
 
+        # Handle empty response - return actual response
+        if not response_data.content or response_data.content == b'':
+            return response_data
+        
         # Validate the content type.
         if "content-type" in response_data.headers:
             if "json" in response_data.headers["content-type"]:
@@ -634,5 +638,9 @@ class MConnectB:
                 raise ex.DataException("Unknown Content-Type ({content_type}) with response: ({content})".format(
                     content_type=response_data.headers["content-type"],
                     content=response_data.content))
+        else:
+            # No content-type header - return actual response
+            if not response_data.content or response_data.content == b'':
+                return response_data
 
         return response_data 
