@@ -213,7 +213,7 @@ except:
     test_logger.info(f"Request : Get Trade Book. Response received : {trade_book.content} Status: {trade_book.status_code}")
 
 #Get Intraday chart
-intr_chart=nconnect_obj.get_intraday_chart("1","AUBANK","ONE_MINUTE")
+intr_chart=nconnect_obj.get_intraday_chart("1","22","ONE_DAY")
 try:
     test_logger.info(f"Request : Get Intraday chart data. Response received : {intr_chart.json()}")
 except:

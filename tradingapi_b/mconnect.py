@@ -481,9 +481,9 @@ class MConnectB:
             self.logger.error(stack_trace)
         return trade_book_details
 
-    def get_intraday_chart(self,_exchange,_symbolname,_interval):
+    def get_intraday_chart(self,_exchange,_symboltoken,_interval):
         try:
-            data_packet={"exchange": _exchange,"symbolname":_symbolname,"interval": _interval}
+            data_packet={"exchange": _exchange,"symboltoken":_symboltoken,"interval": _interval}
             intraday_chart=self._post(
                 route="intraday_chart",
                 params=data_packet,
