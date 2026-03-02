@@ -1,0 +1,6 @@
+{
+    "status": "False",
+    "message": "Trigger price can not be blank.",
+    "errorcode": "IA400",
+    "data": "None"
+}
